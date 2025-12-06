@@ -11,6 +11,31 @@ import GHC.Show (Show(..))
 import qualified GHC.Types as GHC
 
 -----------------------------------------------------
+-- Basic Generic Functions
+-----------------------------------------------------
+
+id :: a -> a
+id x = x
+
+const :: a -> b -> a
+const x _ = x
+
+flip :: (a -> b -> c) -> b -> a -> c
+flip f x y = f y x
+
+infixr 9 .
+(.) :: (b -> c) -> (a -> b) -> a -> c
+(.) f g x = f (g x)
+
+infixr 0 $
+($) :: (a -> b) -> a -> b
+f $ x = f x
+
+infixl 1 &
+(&) :: a -> (a -> b) -> b
+x & f = f x
+
+-----------------------------------------------------
 -- Types
 -----------------------------------------------------
 
@@ -98,7 +123,12 @@ instance Eq a => Eq (Maybe a) where
     Just x  == Just y  = x == y
     _       == _       = False
 
-
+instance Ord a => Ord (Maybe a) where
+    compare :: Maybe a -> Maybe a -> Ordering
+    compare Nothing Nothing   = EQ
+    compare Nothing (Just _)  = LT
+    compare (Just _) Nothing  = GT
+    compare (Just x) (Just y) = compare x y
 
 -----------------------------------------------------
 -- Classes
