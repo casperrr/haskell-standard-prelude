@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use if" #-}
 {-# HLINT ignore "Use /=" #-}
@@ -9,6 +10,12 @@ module MyPrelude where
 
 import GHC.Show (Show(..))
 import qualified GHC.Types as GHC
+import GHC.Types (Int)
+import GHC.Num (Num(..), (+), (-), (*), fromInteger, Integer)
+import qualified GHC.Classes as GHC
+import GHC.Err (error)
+
+default (Int, Integer)
 
 -----------------------------------------------------
 -- Basic Generic Functions
@@ -41,7 +48,7 @@ x & f = f x
 
 type Char = GHC.Char
 type String = [Char]
-type Int = GHC.Int
+-- type Int = GHC.Int
 
 ------------------------------
 -- Bool
@@ -111,9 +118,8 @@ instance Eq Ordering where
     _  == _  = False
 
 ------------------------------
--- Ordering
+-- Maybe
 ------------------------------
-
 data Maybe a = Nothing | Just a
 
 --------- Maybe Instances ---------
@@ -130,6 +136,142 @@ instance Ord a => Ord (Maybe a) where
     compare (Just _) Nothing  = GT
     compare (Just x) (Just y) = compare x y
 
+------------------------------
+-- List
+------------------------------
+-- data [] a = [] | a : [a]
+
+--------- List Instances ---------
+instance Eq a => Eq [a] where
+    (==) :: [a] -> [a] -> Bool
+    []     == []     = True
+    (x:xs) == (y:ys) = (x == y) && (xs == ys)
+    _      == _      = False
+
+instance Ord a => Ord [a] where
+    compare :: [a] -> [a] -> Ordering
+    compare []     []     = EQ
+    compare []     (_:_)  = LT
+    compare (_:_)  []     = GT
+    compare (x:xs) (y:ys) = case compare x y of
+        EQ  -> compare xs ys
+        ord -> ord
+
+---------- List Functions ---------
+
+infixr 5 ++
+(++) :: [a] -> [a] -> [a]
+[]     ++ ys = ys
+(x:xs) ++ ys = x : (xs ++ ys)
+
+head :: [a] -> a
+head (x:_) = x
+head []    = error "head: empty list"
+
+last :: [a] -> a
+last = head . reverse
+
+tail :: [a] -> [a]
+tail (_:xs) = xs
+tail []     = error "tail: empty list"
+
+reverse :: [a] -> [a]
+reverse []     = []
+reverse (x:xs) = reverse xs ++ [x]
+
+length :: [a] -> Int
+length []     = 0
+length (_:xs) = 1 + length xs
+
+singleton :: a -> [a]
+singleton x = [x]
+
+init :: [a] -> [a]
+init = reverse . tail . reverse
+
+null :: [a] -> Bool
+null [] = True
+null _  = False
+
+map :: (a -> b) -> [a] -> [b]
+map _ []     = []
+map f (x:xs) = f x : map f xs
+
+intersperse :: a -> [a] -> [a]
+intersperse _ []     = []
+intersperse _ [y]    = [y]
+intersperse x (y:ys) = y : x : intersperse x ys
+
+foldl :: (b -> a -> b) -> b -> [a] -> b
+foldl _ z [] = z
+foldl f z (x:xs) = foldl f (f z x) xs
+
+foldl1 :: (a -> a -> a) -> [a] -> a
+foldl1 _ []     = error "foldl1: empty list"
+foldl1 f (x:xs) = foldl f x xs
+
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr _ z []     = z
+foldr f z (x:xs) = f x (foldr f z xs)
+
+concat :: [[a]] -> [a]
+concat = foldr (++) []
+
+and :: [Bool] -> Bool
+and = foldr (&&) True
+
+or :: [Bool] -> Bool
+or = foldr (||) False
+
+sum :: Num a => [a] -> a
+sum = foldr (+) 0
+
+product :: Num a => [a] -> a
+product = foldr (*) 1
+
+scanl :: (b -> a -> b) -> b -> [a] -> [b]
+scanl _ z []     = [z]
+scanl f z (x:xs) = z : scanl f (f z x) xs
+
+scanr :: (a -> b -> b) -> b -> [a] -> [b]
+scanr _ z [] = [z]
+scanr f z (x:xs) = f x q : qs
+    where qs@(q:_) = scanr f z xs
+
+take :: Int -> [a] -> [a]
+take n xs = case n == 0 of
+    True -> []
+    False -> case_take n xs
+  where
+    case_take _ [] = []
+    case_take m (x:xs) = x : take (m-1) xs
+
+drop :: Int -> [a] -> [a]
+drop n xs = reverse . take (length xs - n) $ reverse xs
+
+zip :: [a] -> [b] -> [(a,b)]
+zip []     _      = []
+zip _      []     = []
+zip (x:xs) (y:ys) = (x,y) : zip xs ys
+
+------------------------------
+-- Int
+------------------------------
+-- type Int = GHC.Int
+--------- Int Instances ---------
+instance Eq Int where
+    (==) :: Int -> Int -> Bool
+    x == y = case x GHC.== y of
+        GHC.True  -> True
+        GHC.False -> False
+
+instance Ord Int where
+    compare :: Int -> Int -> Ordering
+    compare x y = case x GHC.== y of
+        GHC.True  -> EQ
+        GHC.False -> case x GHC.<= y of
+            GHC.True  -> LT
+            GHC.False -> GT
 -----------------------------------------------------
 -- Classes
 -----------------------------------------------------
@@ -162,8 +304,11 @@ class Eq a => Ord a where
     min x y = if x <= y then x else y
 
 --------- Num Class ---------
-class Num a where
-    (+), (-), (*)       :: a -> a -> a
-    negate, abs, signum :: a -> a
+-- Too complicated to reimplement here
+-- class Num a where
+--     (+), (-), (*)       :: a -> a -> a
+--     negate, abs, signum :: a -> a
+--     fromInteger         :: Integer -> a
 
-    x - y = x + negate y
+--     x - y = x + negate y
+--     negate x = 0 - x
